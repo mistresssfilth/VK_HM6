@@ -1,90 +1,110 @@
-//package dao;
-//
-//import commons.JDBCCredentials;
-//import entity.Organization;
-//import org.jetbrains.annotations.NotNull;
-//
-//import java.sql.Connection;
-//import java.sql.DriverManager;
-//import java.sql.SQLException;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-//public final class OrganizationDAO implements DAO<Organization> {
-//    private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
-//    private static Connection connection;
-//
-//    public OrganizationDAO() {
-//        try {
-//            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//
-//
-//    }
-//
-//    @Override
-//    public List<Organization> getAll() {
-//        final var result = new ArrayList<Organization>();
-//        try(var statement = connection.createStatement()){
-//            try(var resultSet = statement.executeQuery("SELECT * FROM organizations")){
-//                while(resultSet.next()){
-//                    result.add(new Organization(resultSet.getInt("id"), resultSet.getString("name"), resultSet.getInt("inn"), resultSet.getInt("checking_account")));
-//                }
-//                return result;
-//            }
-//        }catch (SQLException e){
-//            e.printStackTrace();
-//        }
-//        return result;
-//    }
-//
-//    @Override
-//    public Organization getById(@NotNull int id) {
-//        try (var statement = connection.createStatement()){
-//            try(var resultSet = statement.executeQuery("SELECT * FROM organizations WHERE id = " + id)){
-//                if (resultSet.next())
-//                    return new Organization(resultSet.getInt("id"), resultSet.getString("name"), resultSet.getInt("inn"), resultSet.getInt("checking_account"));
-//            }
-//        }catch (SQLException e){
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
-//
-//    @Override
-//    public void save(@NotNull Organization entity) {
-//        try(var preparedStatement = connection.prepareStatement("INSERT INTO organizations(id, name, inn, checking_account) VALUES (?, ?, ?, ?)")) {
-//            preparedStatement.setInt(1, entity.getId());
-//            preparedStatement.setString(2, entity.getName());
-//            preparedStatement.setInt(3, entity.getInn());
-//            preparedStatement.setInt(4, entity.getCheckingAccount());
-//            preparedStatement.executeUpdate();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    @Override
-//    public void update(@NotNull Organization entity) {
-//        try(var preparedStatement = connection.prepareStatement("UPDATE organizations SET name = ? WHERE id = ?")) {
-//            preparedStatement.setString(1, entity.getName());
-//            preparedStatement.setInt(2, entity.getId());
-//            preparedStatement.executeUpdate();
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//    @Override
-//    public void delete(@NotNull Organization entity) {
-//        try(var preparedStatement = connection.prepareStatement("DELETE FROM organizations WHERE id = ?")) {
-//            preparedStatement.setInt(1, entity.getId());
-//            if (preparedStatement.executeUpdate() == 0)
-//                throw new IllegalStateException("Record not found");
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//
-//    }
-//}
+package dao;
+
+import commons.JDBCCredentials;
+import entity.Organization;
+import generated.Tables;
+import generated.tables.records.OrganizationsRecord;
+import org.jetbrains.annotations.NotNull;
+import org.jooq.DSLContext;
+import org.jooq.Result;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class OrganizationDAO implements DAO<Organization> {
+    private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
+    private static Connection connection;
+
+    public OrganizationDAO() {
+        try {
+            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    @Override
+    public @NotNull List<Organization> getAll() {
+        List<Organization> organizations = new ArrayList<>();
+        try {
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            final Result<OrganizationsRecord> records = context.fetch(Tables.ORGANIZATIONS);
+            for (var record : records) {
+                organizations.add(new Organization(
+                        record.getInn(),
+                        record.getName(),
+                        record.getCheckingAccount()));
+            }
+            return organizations;
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public Organization getById(@NotNull int inn) {
+        try {
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            final OrganizationsRecord record = context.fetchOne(Tables.ORGANIZATIONS, Tables.ORGANIZATIONS.INN.eq(inn));
+            if (record != null){
+                return new Organization(
+                        record.getInn(),
+                        record.getName(),
+                        record.getCheckingAccount());
+            }
+
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public void save(@NotNull Organization entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .insertInto(Tables.ORGANIZATIONS, Tables.ORGANIZATIONS.INN, Tables.ORGANIZATIONS.NAME, Tables.ORGANIZATIONS.CHECKING_ACCOUNT)
+                    .values(entity.getInn(), entity.getName(), entity.getCheckingAccount())
+                    .execute();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void update(@NotNull Organization entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .update(Tables.ORGANIZATIONS)
+                    .set(Tables.ORGANIZATIONS.NAME, entity.getName())
+                    .set(Tables.ORGANIZATIONS.CHECKING_ACCOUNT, entity.getCheckingAccount())
+                    .where(Tables.ORGANIZATIONS.INN.eq(entity.getInn()))
+                    .execute();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    @Override
+    public void delete(@NotNull Organization entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .delete(Tables.ORGANIZATIONS)
+                    .where(Tables.ORGANIZATIONS.INN.eq(entity.getInn()))
+                    .execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+}
