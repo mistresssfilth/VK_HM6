@@ -97,10 +97,8 @@ public class ReportManager {
                 .join(INVOICES).on(INVOICES.ID.eq(POSITIONS.INVOICE_ID))
                 .where(INVOICES.DATE.between(begin.toLocalDate(), end.toLocalDate()))
                 .and(POSITIONS.PRODUCT_ID.eq(id))
-                .fetch();
-        for (var record : records)
-            return record.value1().intValue();
-        return 0;
+                .fetchOne();
+        return records.value1().intValue();
     }
 
     public Map<Organization, List<Product>> getProductsForPeriod(Date begin, Date end) {
