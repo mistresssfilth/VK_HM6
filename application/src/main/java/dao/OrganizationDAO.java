@@ -62,7 +62,7 @@ public final class OrganizationDAO implements DAO<Organization> {
         }catch (Exception e){
             e.printStackTrace();
         }
-        throw new IllegalStateException();
+        return null;
     }
 
     @Override

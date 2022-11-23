@@ -4,6 +4,11 @@ import commons.JDBCCredentials;
 import entity.Organization;
 import entity.Product;
 import org.jetbrains.annotations.NotNull;
+import org.jooq.DSLContext;
+import org.jooq.Record3;
+import org.jooq.Result;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
 
 import java.sql.Connection;
 import java.sql.Date;
@@ -13,6 +18,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static generated.Tables.*;
 
 public class ReportManager {
     private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
@@ -26,121 +33,108 @@ public class ReportManager {
         }
     }
 
-    public List<Organization> getProvidersByCountProducts(){
+    public List<Organization> getProvidersByCountProducts() {
         List<Organization> organizations = new ArrayList<>();
-        try (var statement = connection.createStatement()){
-            try(var resultSet = statement.executeQuery(
-                    "SELECT organizations.id, name, inn, checking_account, SUM(count) as count FROM organizations " +
-                            "INNER JOIN invoices ON organizations.id = invoices.org_id " +
-                            "INNER JOIN positions ON positions.invoice_id = invoices.id " +
-                            "GROUP BY organizations.id, name, inn, checking_account ORDER BY count DESC LIMIT 10"))
-            {
-                while (resultSet.next()) {
-                    organizations.add(new Organization(
-                            resultSet.getInt("id"),
-                            resultSet.getString("name"),
-                            resultSet.getInt("inn"),
-                            resultSet.getInt("checking_account")));
-                }
-                return organizations;
-            }
-        }catch (SQLException e){
-            e.printStackTrace();
+
+        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+        final Result<Record3<Integer, String, Integer>> records = context
+                .select(
+                        ORGANIZATIONS.INN,
+                        ORGANIZATIONS.NAME,
+                        ORGANIZATIONS.CHECKING_ACCOUNT)
+                .from(ORGANIZATIONS)
+                .join(INVOICES).on(INVOICES.ORG_ID.eq(ORGANIZATIONS.INN))
+                .join(POSITIONS).on(POSITIONS.INVOICE_ID.eq(INVOICES.ID))
+                .groupBy(ORGANIZATIONS.INN,
+                        ORGANIZATIONS.NAME,
+                        ORGANIZATIONS.CHECKING_ACCOUNT)
+                .orderBy(DSL.sum(POSITIONS.COUNT).desc())
+                .limit(10)
+                .fetch();
+        for (var record : records) {
+            organizations.add(new Organization(
+                    record.value1(),
+                    record.value2(),
+                    record.value3()
+            ));
         }
         return organizations;
 
     }
 
-    public List<Organization> getProvidersWithCountProductsByValue(int value){
+    public List<Organization> getProvidersWithCountProductsByValue(int value) {
         List<Organization> organizations = new ArrayList<>();
-        try (var statement = connection.prepareStatement("SELECT organizations.id as org_id, " +
-                "organizations.name as org_name, inn, checking_account FROM organizations " +
-                "INNER JOIN invoices ON organizations.id = invoices.org_id " +
-                "INNER JOIN positions ON positions.invoice_id = invoices.id " +
-                "WHERE count > ?")){
-            statement.setInt(1, value);
-            statement.executeQuery();
-            try(var resultSet = statement.getResultSet())
-            {
-                while (resultSet.next()) {
-                    organizations.add(new Organization(
-                            resultSet.getInt("org_id"),
-                            resultSet.getString("org_name"),
-                            resultSet.getInt("inn"),
-                            resultSet.getInt("checking_account")));
-                }
-                return organizations;
-            }
-        }catch (SQLException e){
-            e.printStackTrace();
+
+        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+        final Result<Record3<Integer, String, Integer>> records = context
+                .select(
+                        ORGANIZATIONS.INN,
+                        ORGANIZATIONS.NAME,
+                        ORGANIZATIONS.CHECKING_ACCOUNT
+                )
+                .from(ORGANIZATIONS)
+                .join(INVOICES).on(INVOICES.ORG_ID.eq(ORGANIZATIONS.INN))
+                .join(POSITIONS).on(POSITIONS.INVOICE_ID.eq(INVOICES.ID))
+                .where(POSITIONS.COUNT.greaterThan(value))
+                .fetch();
+        for (var record : records) {
+            organizations.add(new Organization(
+                    record.value1(),
+                    record.value2(),
+                    record.value3()
+            ));
         }
         return organizations;
+
     }
 
-    public Integer getAveragePrice(Date begin, Date end, int id){
-        try (var preparedStatement = connection.prepareStatement(
-                "SELECT AVG(price) as avg_price FROM positions " +
-                "INNER JOIN invoices ON invoices.id = positions.invoice_id " +
-                "WHERE invoices.date BETWEEN ? AND ? AND product_id = ?"))
-        {
-            preparedStatement.setDate(1, begin);
-            preparedStatement.setDate(2, end);
-            preparedStatement.setInt(3, id);
-            try(var resultSet = preparedStatement.executeQuery()){
-                if (resultSet.next()){
-                    return resultSet.getInt("avg_price");
-                }
-                else {
-                    throw new IllegalStateException("No records");
-                }
-            }
+    public Integer getAveragePrice(Date begin, Date end, int id) {
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        throw new IllegalStateException("No records");
+        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+        final var records = context
+                .select(DSL.avg(POSITIONS.PRICE))
+                .from(POSITIONS)
+                .join(INVOICES).on(INVOICES.ID.eq(POSITIONS.INVOICE_ID))
+                .where(INVOICES.DATE.between(begin.toLocalDate(), end.toLocalDate()))
+                .and(POSITIONS.PRODUCT_ID.eq(id))
+                .fetch();
+        for (var record : records)
+            return record.value1().intValue();
+        return 0;
     }
 
-    public Map<Organization, List<Product>> getProductsForPeriod(Date begin, Date end){
+    public Map<Organization, List<Product>> getProductsForPeriod(Date begin, Date end) {
         Map<Organization, List<Product>> products = new HashMap<>();
-        try (var preparedStatement = connection.prepareStatement(
-                "SELECT products.id as pr_id, products.name as product_name, products.code as code, " +
-                        "organizations.id as org_id, organizations.name as org_name, organizations.inn as inn, " +
-                        "organizations.checking_account as checking_account FROM organizations " +
-                        "LEFT JOIN invoices ON invoices.org_id = organizations.id " +
-                        "LEFT JOIN positions ON positions.invoice_id = invoices.id " +
-                        "LEFT JOIN products ON positions.product_id = products.id " +
-                        "WHERE invoices.date BETWEEN ? AND ?"))
-        {
-            preparedStatement.setDate(1, begin);
-            preparedStatement.setDate(2, end);
-            try(var resultSet = preparedStatement.executeQuery()){
-                while(resultSet.next()){
-                    Organization organization = new Organization(
-                            resultSet.getInt("org_id"),
-                            resultSet.getString("org_name"),
-                            resultSet.getInt("inn"),
-                            resultSet.getInt("checking_account"));
-                    if (!products.containsKey(organization)){
-                        products.put(organization, new ArrayList<>());
-                    }
-                    Product product = null;
-                    if (resultSet.getString("product_name") != null){
-                        product = new Product(
-                                resultSet.getInt("pr_id"),
-                                resultSet.getString("product_name"),
-                                resultSet.getInt("code"));
-                    }
-                    products.get(organization).add(product);
 
-                }
-                return products;
+        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+        final var records = context
+                .select(ORGANIZATIONS.INN, ORGANIZATIONS.NAME, ORGANIZATIONS.CHECKING_ACCOUNT,
+                        PRODUCTS.CODE, PRODUCTS.NAME)
+                .from(ORGANIZATIONS)
+                .leftJoin(INVOICES).on(INVOICES.ORG_ID.eq(ORGANIZATIONS.INN))
+                .leftJoin(POSITIONS).on(POSITIONS.INVOICE_ID.eq(INVOICES.ID))
+                .leftJoin(PRODUCTS).on(POSITIONS.PRODUCT_ID.eq(PRODUCTS.CODE))
+                .where(INVOICES.DATE.between(begin.toLocalDate(), end.toLocalDate()))
+                .fetch();
+        for (var record : records) {
+            Organization org = new Organization(
+                    record.value1(),
+                    record.value2(),
+                    record.value3()
+            );
+            if (!products.containsKey(org))
+                products.put(org, new ArrayList<>());
+            Product product = null;
+            if (record.value5() != null) {
+                product = new Product(
+                        record.value4(),
+                        record.value5()
+                );
             }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+            products.get(org).add(product);
         }
         return products;
+
     }
 
 //    public Map<Organization, List<Product>> getCountAndPrice(Date begin, Date end){

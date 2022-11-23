@@ -1,98 +1,121 @@
-//package dao;
-//
-//import commons.JDBCCredentials;
-//import entity.Position;
-//import org.jetbrains.annotations.NotNull;
-//
-//import java.sql.Connection;
-//import java.sql.DriverManager;
-//import java.sql.SQLException;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-//public final class PositionDAO implements DAO<Position> {
-//    private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
-//    private static  Connection connection;
-//
-//    public PositionDAO() {
-//        try {
-//            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    @Override
-//    public List<Position> getAll() {
-//        final var result = new ArrayList<Position>();
-//        try(var statement = connection.createStatement()){
-//            try(var resultSet = statement.executeQuery("SELECT * FROM positions")){
-//                while(resultSet.next()){
-//                    result.add(new Position(
-//                            resultSet.getInt("id"),
-//                            resultSet.getInt("price"),
-//                            resultSet.getInt("product_id"),
-//                            resultSet.getInt("count"),
-//                            resultSet.getInt("invoice_id")));
-//                }
-//                return result;
-//            }
-//        }catch (SQLException e){
-//            e.printStackTrace();
-//        }
-//        return result;
-//    }
-//
-//    @Override
-//    public Position getById(@NotNull int id) {
-//        try (var statement = connection.createStatement()){
-//            try(var resultSet = statement.executeQuery("SELECT * FROM positions WHERE id = " + id)){
-//                if (resultSet.next())
-//                    return new Position(
-//                            resultSet.getInt("id"),
-//                            resultSet.getInt("price"),
-//                            resultSet.getInt("product_id"),
-//                            resultSet.getInt("count"),
-//                            resultSet.getInt("invoice_id"));
-//            }
-//        }catch (SQLException e){
-//            e.printStackTrace();
-//        }
-//        return null;    }
-//
-//    @Override
-//    public void save(@NotNull Position entity) {
-//        try(var preparedStatement = connection.prepareStatement("INSERT INTO positions(id, price, product_id, count, invoice_id) VALUES (?, ?, ?,?, ?)")) {
-//            preparedStatement.setInt(1, entity.getId());
-//            preparedStatement.setInt(2, entity.getPrice());
-//            preparedStatement.setInt(3, entity.getProductId());
-//            preparedStatement.setInt(4, entity.getCount());
-//            preparedStatement.setInt(5, entity.getInvoiceId());
-//            preparedStatement.executeUpdate();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-//    @Override
-//    public void update(@NotNull Position entity) {
-//        try(var preparedStatement = connection.prepareStatement("UPDATE positions SET price = ?, count = ? WHERE id = ?")) {
-//            preparedStatement.setInt(1, entity.getPrice());
-//            preparedStatement.setInt(2, entity.getCount());
-//            preparedStatement.setInt(3, entity.getId());
-//            preparedStatement.executeUpdate();
-//        } catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//    }
-//
-//    @Override
-//    public void delete(@NotNull Position entity) {
-//        try(var preparedStatement = connection.prepareStatement("DELETE FROM positions WHERE id = ?")) {
-//            preparedStatement.setInt(1, entity.getId());
-//            if (preparedStatement.executeUpdate() == 0)
-//                throw new IllegalStateException("Record not found");
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-//}
+package dao;
+
+import commons.JDBCCredentials;
+import entity.Position;
+import generated.Tables;
+import generated.tables.records.PositionsRecord;
+import org.jetbrains.annotations.NotNull;
+import org.jooq.DSLContext;
+import org.jooq.Result;
+import org.jooq.SQLDialect;
+import org.jooq.impl.DSL;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class PositionDAO implements DAO<Position> {
+    private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
+    private static  Connection connection;
+
+    public PositionDAO() {
+        try {
+            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public List<Position> getAll() {
+        final List<Position> positions = new ArrayList<>();
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            final Result<PositionsRecord> records = context.fetch(Tables.POSITIONS);
+            for (var record : records) {
+                positions.add(new Position(
+                        record.getId(),
+                        record.getPrice(),
+                        record.getProductId(),
+                        record.getInvoiceId(),
+                        record.getCount()
+                ));
+            }
+            return positions;
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        throw new IllegalStateException();
+    }
+
+    @Override
+    public Position getById(@NotNull int id) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            final PositionsRecord record = context.fetchOne(Tables.POSITIONS, Tables.POSITIONS.ID.eq(id));
+            if (record != null){
+                return new Position(
+                        record.getId(),
+                        record.getPrice(),
+                        record.getProductId(),
+                        record.getInvoiceId(),
+                        record.getCount()
+                );
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    @Override
+    public void save(@NotNull Position entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .insertInto(
+                            Tables.POSITIONS,
+                            Tables.POSITIONS.ID,
+                            Tables.POSITIONS.PRICE,
+                            Tables.POSITIONS.PRODUCT_ID,
+                            Tables.POSITIONS.INVOICE_ID,
+                            Tables.POSITIONS.COUNT
+                    )
+                    .values(entity.getId(), entity.getPrice(), entity.getProductId(), entity.getInvoiceId(), entity.getCount())
+                    .execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    @Override
+    public void update(@NotNull Position entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .update(Tables.POSITIONS)
+                    .set(Tables.POSITIONS.PRICE, entity.getPrice())
+                    .set(Tables.POSITIONS.PRODUCT_ID, entity.getProductId())
+                    .set(Tables.POSITIONS.INVOICE_ID, entity.getInvoiceId())
+                    .set(Tables.POSITIONS.COUNT, entity.getCount())
+                    .where(Tables.POSITIONS.ID.eq(entity.getId()))
+                    .execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void delete(@NotNull Position entity) {
+        try{
+            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+            context
+                    .delete(Tables.POSITIONS)
+                    .where(Tables.POSITIONS.ID.eq(entity.getId()))
+                    .execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
