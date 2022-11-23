@@ -23,20 +23,21 @@ import static generated.Tables.*;
 
 public class ReportManager {
     private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
-    private static Connection connection;
+    private DSLContext context;
+    private Connection connection;
+
 
     public ReportManager() {
         try {
-            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.context = DSL.using(connection, SQLDialect.POSTGRES);
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    public List<Organization> getProvidersByCountProducts() {
+    public @NotNull List<Organization> getProvidersByCountProducts() {
         List<Organization> organizations = new ArrayList<>();
-
-        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
         final Result<Record3<Integer, String, Integer>> records = context
                 .select(
                         ORGANIZATIONS.INN,
@@ -62,10 +63,8 @@ public class ReportManager {
 
     }
 
-    public List<Organization> getProvidersWithCountProductsByValue(int value) {
+    public @NotNull List<Organization> getProvidersWithCountProductsByValue(int value) {
         List<Organization> organizations = new ArrayList<>();
-
-        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
         final Result<Record3<Integer, String, Integer>> records = context
                 .select(
                         ORGANIZATIONS.INN,
@@ -88,23 +87,26 @@ public class ReportManager {
 
     }
 
-    public Integer getAveragePrice(Date begin, Date end, int id) {
-
-        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
+    public Map<Product, Double> getAveragePrice(Date begin, Date end) {
+        Map<Product, Double> map = new HashMap<>();
         final var records = context
-                .select(DSL.avg(POSITIONS.PRICE))
+                .select(PRODUCTS.CODE, PRODUCTS.NAME, DSL.avg(POSITIONS.PRICE))
                 .from(POSITIONS)
                 .join(INVOICES).on(INVOICES.ID.eq(POSITIONS.INVOICE_ID))
+                .join(PRODUCTS).on(POSITIONS.PRODUCT_ID.eq(PRODUCTS.CODE))
                 .where(INVOICES.DATE.between(begin.toLocalDate(), end.toLocalDate()))
-                .and(POSITIONS.PRODUCT_ID.eq(id))
-                .fetchOne();
-        return records.value1().intValue();
+                .groupBy(PRODUCTS.CODE, PRODUCTS.NAME)
+                .fetch();
+        for (var record : records){
+            Product product = new Product(record.value1(), record.value2());
+            if(!map.containsKey(product))
+                map.put(product, record.value3().doubleValue());
+        }
+        return map;
     }
 
-    public Map<Organization, List<Product>> getProductsForPeriod(Date begin, Date end) {
+    public @NotNull Map<Organization, List<Product>> getProductsForPeriod(Date begin, Date end) {
         Map<Organization, List<Product>> products = new HashMap<>();
-
-        final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
         final var records = context
                 .select(ORGANIZATIONS.INN, ORGANIZATIONS.NAME, ORGANIZATIONS.CHECKING_ACCOUNT,
                         PRODUCTS.CODE, PRODUCTS.NAME)
@@ -134,31 +136,46 @@ public class ReportManager {
         return products;
 
     }
+    public @NotNull Map<Date, List<Map<Product, Map<Integer, Integer>>>> getCountAndPrice(Date begin, Date end){
+        Map<Date, List<Map<Product, Map<Integer, Integer>>>> map = new HashMap<>();
+        Map<Product, Integer> count = new HashMap<>();
+        Map<Product, Integer> summary = new HashMap<>();
 
-//    public Map<Organization, List<Product>> getCountAndPrice(Date begin, Date end){
-//        Map<Organization, List<Product>> products = new HashMap<>();
-//        try (var preparedStatement = connection.prepareStatement(
-//                "SELECT products.id as prod_id, products.name as product_name, products.code, SUM(count), price " +
-//                        "FROM products " +
-//                        "LEFT JOIN positions ON positions.product_id = products.id " +
-//                        "LEFT JOIN invoices ON positions.invoice_id = invoices.id " +
-//                        "WHERE invoices.date BETWEEN '2020-03-05' AND '2022-12-12' " +
-//                        "GROUP BY products.id, price "))
-//        {
-//            preparedStatement.setDate(1, begin);
-//            preparedStatement.setDate(2, end);
-//            try(var resultSet = preparedStatement.getResultSet()){
-//                while(resultSet.next()){
-//                    Product product = new Product(
-//                                resultSet.getInt("prod_id"),
-//                                resultSet.getString("product_name"),
-//                                resultSet.getInt("code"));
-//                    }
-//                }
-//            }
-//        catch (SQLException e) {
-//            e.printStackTrace();
-//        }
-//        return products;
-//    }
+        var records = context
+                .select(INVOICES.DATE, PRODUCTS.CODE, PRODUCTS.NAME, DSL.sum(POSITIONS.COUNT), DSL.sum(POSITIONS.PRICE))
+                .from(PRODUCTS)
+                .leftJoin(POSITIONS).on(POSITIONS.PRODUCT_ID.eq(PRODUCTS.CODE))
+                .leftJoin(INVOICES).on(POSITIONS.INVOICE_ID.eq(INVOICES.ID))
+                .where(INVOICES.DATE.between(begin.toLocalDate(), end.toLocalDate()))
+                .groupBy(INVOICES.DATE, PRODUCTS.NAME, PRODUCTS.CODE)
+                .fetch();
+
+        for (var record : records){
+            Product product = new Product(
+                    record.value2(),
+                    record.value3()
+            );
+            if(!count.containsKey(product))
+                count.put(product, 0);
+            if(!summary.containsKey(product))
+                summary.put(product, 0);
+
+            count.put(product, count.get(product) + record.value4().intValue());
+            summary.put(product, summary.get(product) + record.value5().intValue());
+
+            Date date = Date.valueOf(record.value1());
+
+            if(!map.containsKey(date))
+                map.put(date, new ArrayList<>());
+
+            Map<Integer, Integer> map1 = new HashMap<>();
+            map1.put(count.get(product), summary.get(product));
+
+            Map<Product, Map<Integer, Integer>> productMapMap = new HashMap<>();
+            productMapMap.put(product, map1);
+            map.get(date).add(productMapMap);
+
+        }
+        return map;
+    }
 }

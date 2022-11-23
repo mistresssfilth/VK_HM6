@@ -25,9 +25,20 @@ public class Main {
             System.out.println(organization.getName() + "\t\t" + organization.getInn() + "\t\t" + organization.getCheckingAccount());
         }
 
+        System.out.println("\nReport #3");
+        Map<Date, List<Map<Product, Map<Integer, Integer>>>> countAndPrice = reportManager.getCountAndPrice(begin, end);
+        for (Map.Entry<Date, List<Map<Product, Map<Integer, Integer>>>> entry : countAndPrice.entrySet()){
+            System.out.println(entry.getKey() + "\t\t");
+            for (Map<Product, Map<Integer, Integer>> item : entry.getValue()){
+                System.out.println(item);
+            }
+        }
+
         System.out.println("\nReport #4");
-        Integer averagePrice = reportManager.getAveragePrice(begin, end, 112);
-        System.out.println("Average price: " + averagePrice);
+        Map<Product, Double> averagePrice = reportManager.getAveragePrice(begin, end);
+        for(Map.Entry<Product, Double> entry : averagePrice.entrySet()){
+            System.out.println(entry.getKey() + "\t\t" + entry.getValue());
+        }
 
         System.out.println("\nReport #5");
         Map<Organization, List<Product>> map = reportManager.getProductsForPeriod(begin, end);

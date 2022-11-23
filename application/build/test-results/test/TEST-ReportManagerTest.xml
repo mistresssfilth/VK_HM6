@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="ReportManagerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2022-11-23T14:00:37" hostname="DESKTOP-RDK8APU" time="0.834">
+<testsuite name="ReportManagerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2022-11-23T15:03:32" hostname="DESKTOP-RDK8APU" time="0.447">
   <properties/>
-  <testcase name="getAveragePrice()" classname="ReportManagerTest" time="0.834"/>
+  <testcase name="getAveragePrice()" classname="ReportManagerTest" time="0.447"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
 SLF4J: Defaulting to no-operation (NOP) logger implementation

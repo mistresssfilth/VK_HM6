@@ -39,8 +39,11 @@ public class ReportManagerTest {
     }
     @Test
     void getAveragePrice(){
-        int avg = 3369;
-        assertEquals(avg, reportManager.getAveragePrice(BEGIN, END, 112));
+        String expected = "{Product(code=101, name=Item 1)=1100.0, " +
+                "Product(code=242, name=Item 5)=390.0, " +
+                "Product(code=112, name=Item 2)=3369.0, " +
+                "Product(code=353, name=Item 4)=1300.0}";
+        assertEquals(expected.trim(), reportManager.getAveragePrice(BEGIN, END).toString().trim());
     }
     @Test
     void getProductsForPeriod(){
@@ -54,5 +57,15 @@ public class ReportManagerTest {
         map.put(new Organization(1589,"Provider 2",158538), productsByProvider2);
 
         assertEquals(map, reportManager.getProductsForPeriod(BEGIN, END));
+    }
+
+    @Test
+    void getCountAndPrice(){
+        String expected = "{2022-05-03=[{Product(code=101, name=Item 1)={1=1100}}, " +
+                "{Product(code=353, name=Item 4)={2=1300}}], " +
+                "2021-08-10=[{Product(code=242, name=Item 5)={10=390}}], " +
+                "2019-03-06=[{Product(code=112, name=Item 2)={4=3369}}]}";
+        assertEquals(expected.trim(), reportManager.getCountAndPrice(BEGIN, END).toString().trim());
+
     }
 }
