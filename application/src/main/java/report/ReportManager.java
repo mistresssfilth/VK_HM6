@@ -136,8 +136,8 @@ public class ReportManager {
         return products;
 
     }
-    public @NotNull Map<Date, List<Map<Product, Map<Integer, Integer>>>> getCountAndPrice(Date begin, Date end){
-        Map<Date, List<Map<Product, Map<Integer, Integer>>>> map = new HashMap<>();
+    public @NotNull Map<Date, Map<Product, Map<Integer, Integer>>> getCountAndPrice(Date begin, Date end){
+        Map<Date, Map<Product, Map<Integer, Integer>>> map = new HashMap<>();
         Map<Product, Integer> count = new HashMap<>();
         Map<Product, Integer> summary = new HashMap<>();
 
@@ -166,14 +166,12 @@ public class ReportManager {
             Date date = Date.valueOf(record.value1());
 
             if(!map.containsKey(date))
-                map.put(date, new ArrayList<>());
+                map.put(date, new HashMap<>());
 
             Map<Integer, Integer> map1 = new HashMap<>();
             map1.put(count.get(product), summary.get(product));
 
-            Map<Product, Map<Integer, Integer>> productMapMap = new HashMap<>();
-            productMapMap.put(product, map1);
-            map.get(date).add(productMapMap);
+            map.get(date).put(product, map1);
 
         }
         return map;

@@ -26,12 +26,17 @@ public class Main {
         }
 
         System.out.println("\nReport #3");
-        Map<Date, List<Map<Product, Map<Integer, Integer>>>> countAndPrice = reportManager.getCountAndPrice(begin, end);
-        for (Map.Entry<Date, List<Map<Product, Map<Integer, Integer>>>> entry : countAndPrice.entrySet()){
+        Map<Date, Map<Product, Map<Integer, Integer>>> countAndPrice = reportManager.getCountAndPrice(begin, end);
+        for (Map.Entry<Date, Map<Product, Map<Integer, Integer>>> entry : countAndPrice.entrySet()){
             System.out.println(entry.getKey() + "\t\t");
-            for (Map<Product, Map<Integer, Integer>> item : entry.getValue()){
-                System.out.println(item);
+            for (Map.Entry<Product, Map<Integer, Integer>> item : entry.getValue().entrySet()){
+                System.out.println(item.getKey() + "\t\t");
+                System.out.println("count" + "\t" + "sum");
+                for(Map.Entry<Integer, Integer> count : item.getValue().entrySet()){
+                    System.out.println(count.getKey() + "\t\t" + count.getValue());
+                }
             }
+
         }
 
         System.out.println("\nReport #4");
