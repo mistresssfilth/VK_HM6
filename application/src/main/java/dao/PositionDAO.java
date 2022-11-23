@@ -16,13 +16,17 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static generated.Tables.POSITIONS;
+
 public final class PositionDAO implements DAO<Position> {
     private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
-    private static  Connection connection;
+    private static Connection connection;
+    private static DSLContext context;
 
     public PositionDAO() {
         try {
             connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.context = DSL.using(connection, SQLDialect.POSTGRES);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -31,91 +35,66 @@ public final class PositionDAO implements DAO<Position> {
     @Override
     public List<Position> getAll() {
         final List<Position> positions = new ArrayList<>();
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final Result<PositionsRecord> records = context.fetch(Tables.POSITIONS);
-            for (var record : records) {
-                positions.add(new Position(
-                        record.getId(),
-                        record.getPrice(),
-                        record.getProductId(),
-                        record.getInvoiceId(),
-                        record.getCount()
-                ));
-            }
-            return positions;
-        }catch (Exception e){
-            e.printStackTrace();
+        final Result<PositionsRecord> records = context.fetch(POSITIONS);
+        for (var record : records) {
+            positions.add(new Position(
+                    record.getId(),
+                    record.getPrice(),
+                    record.getProductId(),
+                    record.getInvoiceId(),
+                    record.getCount()
+            ));
         }
-        throw new IllegalStateException();
+        return positions;
     }
 
     @Override
     public Position getById(@NotNull int id) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final PositionsRecord record = context.fetchOne(Tables.POSITIONS, Tables.POSITIONS.ID.eq(id));
-            if (record != null){
-                return new Position(
-                        record.getId(),
-                        record.getPrice(),
-                        record.getProductId(),
-                        record.getInvoiceId(),
-                        record.getCount()
-                );
-            }
-        }catch (Exception e){
-            e.printStackTrace();
+        final PositionsRecord record = context.fetchOne(POSITIONS, POSITIONS.ID.eq(id));
+        if (record != null) {
+            return new Position(
+                    record.getId(),
+                    record.getPrice(),
+                    record.getProductId(),
+                    record.getInvoiceId(),
+                    record.getCount()
+            );
         }
         return null;
     }
 
     @Override
     public void save(@NotNull Position entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .insertInto(
-                            Tables.POSITIONS,
-                            Tables.POSITIONS.ID,
-                            Tables.POSITIONS.PRICE,
-                            Tables.POSITIONS.PRODUCT_ID,
-                            Tables.POSITIONS.INVOICE_ID,
-                            Tables.POSITIONS.COUNT
-                    )
-                    .values(entity.getId(), entity.getPrice(), entity.getProductId(), entity.getInvoiceId(), entity.getCount())
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .insertInto(
+                        POSITIONS,
+                        POSITIONS.ID,
+                        POSITIONS.PRICE,
+                        POSITIONS.PRODUCT_ID,
+                        POSITIONS.INVOICE_ID,
+                        POSITIONS.COUNT
+                )
+                .values(entity.getId(), entity.getPrice(), entity.getProductId(), entity.getInvoiceId(), entity.getCount())
+                .execute();
     }
+
     @Override
     public void update(@NotNull Position entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .update(Tables.POSITIONS)
-                    .set(Tables.POSITIONS.PRICE, entity.getPrice())
-                    .set(Tables.POSITIONS.PRODUCT_ID, entity.getProductId())
-                    .set(Tables.POSITIONS.INVOICE_ID, entity.getInvoiceId())
-                    .set(Tables.POSITIONS.COUNT, entity.getCount())
-                    .where(Tables.POSITIONS.ID.eq(entity.getId()))
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .update(POSITIONS)
+                .set(POSITIONS.PRICE, entity.getPrice())
+                .set(POSITIONS.PRODUCT_ID, entity.getProductId())
+                .set(POSITIONS.INVOICE_ID, entity.getInvoiceId())
+                .set(POSITIONS.COUNT, entity.getCount())
+                .where(POSITIONS.ID.eq(entity.getId()))
+                .execute();
     }
 
     @Override
     public void delete(@NotNull Position entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .delete(Tables.POSITIONS)
-                    .where(Tables.POSITIONS.ID.eq(entity.getId()))
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .delete(POSITIONS)
+                .where(POSITIONS.ID.eq(entity.getId()))
+                .execute();
     }
 }

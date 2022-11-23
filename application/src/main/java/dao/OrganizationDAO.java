@@ -16,95 +16,71 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static generated.Tables.ORGANIZATIONS;
+
 public final class OrganizationDAO implements DAO<Organization> {
     private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
     private static Connection connection;
+    private static DSLContext context;
 
     public OrganizationDAO() {
         try {
-            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.context = DSL.using(connection, SQLDialect.POSTGRES);
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
     @Override
     public @NotNull List<Organization> getAll() {
         List<Organization> organizations = new ArrayList<>();
-        try {
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final Result<OrganizationsRecord> records = context.fetch(Tables.ORGANIZATIONS);
-            for (var record : records) {
-                organizations.add(new Organization(
-                        record.getInn(),
-                        record.getName(),
-                        record.getCheckingAccount()));
-            }
-            return organizations;
+
+        final Result<OrganizationsRecord> records = context.fetch(ORGANIZATIONS);
+        for (var record : records) {
+            organizations.add(new Organization(
+                    record.getInn(),
+                    record.getName(),
+                    record.getCheckingAccount()));
         }
-        catch (Exception e){
-            e.printStackTrace();
-        }
-        throw new IllegalStateException();
+        return organizations;
     }
 
     @Override
     public Organization getById(@NotNull int inn) {
-        try {
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final OrganizationsRecord record = context.fetchOne(Tables.ORGANIZATIONS, Tables.ORGANIZATIONS.INN.eq(inn));
-            if (record != null){
-                return new Organization(
-                        record.getInn(),
-                        record.getName(),
-                        record.getCheckingAccount());
-            }
-
-        }catch (Exception e){
-            e.printStackTrace();
+        final OrganizationsRecord record = context.fetchOne(ORGANIZATIONS, ORGANIZATIONS.INN.eq(inn));
+        if (record != null) {
+            return new Organization(
+                    record.getInn(),
+                    record.getName(),
+                    record.getCheckingAccount());
         }
         return null;
     }
 
     @Override
     public void save(@NotNull Organization entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .insertInto(Tables.ORGANIZATIONS, Tables.ORGANIZATIONS.INN, Tables.ORGANIZATIONS.NAME, Tables.ORGANIZATIONS.CHECKING_ACCOUNT)
-                    .values(entity.getInn(), entity.getName(), entity.getCheckingAccount())
-                    .execute();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .insertInto(ORGANIZATIONS, ORGANIZATIONS.INN, ORGANIZATIONS.NAME, ORGANIZATIONS.CHECKING_ACCOUNT)
+                .values(entity.getInn(), entity.getName(), entity.getCheckingAccount())
+                .execute();
     }
 
     @Override
     public void update(@NotNull Organization entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .update(Tables.ORGANIZATIONS)
-                    .set(Tables.ORGANIZATIONS.NAME, entity.getName())
-                    .set(Tables.ORGANIZATIONS.CHECKING_ACCOUNT, entity.getCheckingAccount())
-                    .where(Tables.ORGANIZATIONS.INN.eq(entity.getInn()))
-                    .execute();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .update(ORGANIZATIONS)
+                .set(ORGANIZATIONS.NAME, entity.getName())
+                .set(ORGANIZATIONS.CHECKING_ACCOUNT, entity.getCheckingAccount())
+                .where(ORGANIZATIONS.INN.eq(entity.getInn()))
+                .execute();
     }
+
     @Override
     public void delete(@NotNull Organization entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .delete(Tables.ORGANIZATIONS)
-                    .where(Tables.ORGANIZATIONS.INN.eq(entity.getInn()))
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        context
+                .delete(ORGANIZATIONS)
+                .where(ORGANIZATIONS.INN.eq(entity.getInn()))
+                .execute();
     }
 }

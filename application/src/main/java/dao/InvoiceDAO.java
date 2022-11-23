@@ -2,36 +2,34 @@ package dao;
 
 import commons.JDBCCredentials;
 import entity.Invoice;
-import entity.Organization;
 import generated.Tables;
 import generated.tables.records.InvoicesRecord;
-import generated.tables.records.OrganizationsRecord;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.DSLContext;
 import org.jooq.Result;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
-import org.jooq.impl.QOM;
 
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+
+import static generated.Tables.INVOICES;
 
 @SuppressWarnings({"NotNullNullableValidation", "SqlNoDataSourceInspection", "SqlResolve"})
 public final class InvoiceDAO implements DAO<Invoice> {
 
     private static final @NotNull JDBCCredentials CREDS = JDBCCredentials.DEFAULT;
-    private static  Connection connection;
+    private static Connection connection;
+    private static DSLContext context;
 
     public InvoiceDAO() {
         try {
-            connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.connection = DriverManager.getConnection(CREDS.getUrl(), CREDS.getLogin(), CREDS.getPassword());
+            this.context = DSL.using(connection, SQLDialect.POSTGRES);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -40,81 +38,56 @@ public final class InvoiceDAO implements DAO<Invoice> {
     @Override
     public List<Invoice> getAll() {
         List<Invoice> invoices = new ArrayList<>();
-        try {
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final Result<InvoicesRecord> records = context.fetch(Tables.INVOICES);
-            for (var record : records) {
-                invoices.add(new Invoice(
-                        record.getId(),
-                        Date.valueOf((record.getDate().toString())),
-                        record.getOrgId()
-                ));
-            }
-            return invoices;
+
+        final Result<InvoicesRecord> records = context.fetch(INVOICES);
+        for (var record : records) {
+            invoices.add(new Invoice(
+                    record.getId(),
+                    Date.valueOf((record.getDate().toString())),
+                    record.getOrgId()
+            ));
         }
-        catch (Exception e){
-            e.printStackTrace();
-        }
-        throw new IllegalStateException();
+        return invoices;
     }
 
     @Override
     public Invoice getById(@NotNull int id) {
-        try {
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            final InvoicesRecord record = context.fetchOne(Tables.INVOICES, Tables.INVOICES.ID.eq(id));
-            if (record != null){
-                return new Invoice(
-                        record.getId(),
-                        Date.valueOf((record.getDate().toString())),
-                        record.getOrgId()
-                );
-
-            }
-        }catch (Exception e){
-            e.printStackTrace();
+        final InvoicesRecord record = context.fetchOne(INVOICES, INVOICES.ID.eq(id));
+        if (record != null) {
+            return new Invoice(
+                    record.getId(),
+                    Date.valueOf((record.getDate().toString())),
+                    record.getOrgId()
+            );
         }
         return null;
     }
 
     @Override
     public void save(@NotNull Invoice entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .insertInto(Tables.INVOICES, Tables.INVOICES.ID, Tables.INVOICES.DATE, Tables.INVOICES.ORG_ID)
-                    .values(entity.getId(), entity.getDate().toLocalDate(), entity.getOrgId())
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .insertInto(INVOICES, INVOICES.ID, INVOICES.DATE, INVOICES.ORG_ID)
+                .values(entity.getId(), entity.getDate().toLocalDate(), entity.getOrgId())
+                .execute();
+
     }
+
     @Override
     public void update(@NotNull Invoice entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .update(Tables.INVOICES)
-                    .set(Tables.INVOICES.DATE, entity.getDate().toLocalDate())
-                    .set(Tables.INVOICES.ORG_ID, entity.getOrgId())
-                    .where(Tables.INVOICES.ID.eq(entity.getId()))
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        context
+                .update(INVOICES)
+                .set(INVOICES.DATE, entity.getDate().toLocalDate())
+                .set(INVOICES.ORG_ID, entity.getOrgId())
+                .where(INVOICES.ID.eq(entity.getId()))
+                .execute();
+
     }
 
     @Override
     public void delete(@NotNull Invoice entity) {
-        try{
-            final DSLContext context = DSL.using(connection, SQLDialect.POSTGRES);
-            context
-                    .delete(Tables.INVOICES)
-                    .where(Tables.INVOICES.ID.eq(entity.getId()))
-                    .execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        context
+                .delete(INVOICES)
+                .where(INVOICES.ID.eq(entity.getId()))
+                .execute();
     }
 }

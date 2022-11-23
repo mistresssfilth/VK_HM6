@@ -36,7 +36,6 @@ public class Main {
                     System.out.println(count.getKey() + "\t\t" + count.getValue());
                 }
             }
-
         }
 
         System.out.println("\nReport #4");
